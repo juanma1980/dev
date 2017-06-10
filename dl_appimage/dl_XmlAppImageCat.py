@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #Download and generate a yml catalog from appimage repository at https://dl.bintray.com/probono/AppImages/
-
+import sys
 import urllib.request
 import threading
 from bs4 import BeautifulSoup
@@ -130,6 +130,13 @@ def write_yml(applist,outfile):
         f.write("  - version: "+version+"\n")
     f.close()
 
+args=sys.argv[1:]
+if '-y' in args:
+    sw_generate='yml'
+    print("Generating dep11 catalogue...")
+else:
+    sw_generate='xml'
+    print("Generating xml catalogue...")
 outfile='appimage.yml'
 outdir="/usr/share/metainfo"
 outdir="/tmp"
@@ -140,9 +147,11 @@ descDict={}
 for repo in repolist:
     print(("Fetching repo %s")%(repo))
     applist=generate_applist(fetch_repo(repo))
-    print("Generating dep11 catalogue...")
-#    write_yml(applist,outfile)
-    th_generate_xml_catalog(applist,outdir)
+    print("Processing info...")
+    if sw_generate=='yml':
+        write_yml(applist,outfile)
+    else:
+        th_generate_xml_catalog(applist,outdir)
     print("Work done!")
 
 
