@@ -6,7 +6,6 @@ from urllib.request import urlretrieve
 import shutil
 import json
 import os
-from subprocess import call
 import sys
 import threading
 from bs4 import BeautifulSoup
@@ -39,7 +38,7 @@ class appimageToAppstream:
 			print ('DEBUG appimage: %s'%msg)
 	#def debug
 
-	def get_bundles_catalogue(self):
+	def load_appimage_catalogue(self):
 		applist=[]
 		appdict={}
 		all_apps=[]
@@ -397,4 +396,4 @@ class appimageToAppstream:
 
 
 catalogue=appimageToAppstream()
-catalogue.get_bundles_catalogue()
+catalogue.load_appimage_catalogue()
