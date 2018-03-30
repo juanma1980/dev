@@ -6,6 +6,7 @@ from urllib.request import urlretrieve
 import shutil
 import json
 import os
+from subprocess import call
 import sys
 import threading
 from bs4 import BeautifulSoup
@@ -21,7 +22,7 @@ import time
 class appimageToAppstream:
 
 	def __init__(self):
-		self.dbg=True
+		self.dbg=False
 		#To get the description of an app we must go to a specific url defined in url_info.
 		#$(appname) we'll be replaced with the appname so the url matches the right one.
 		#If other site has other url naming convention it'll be mandatory to define it with the appropiate replacements
@@ -38,7 +39,7 @@ class appimageToAppstream:
 			print ('DEBUG appimage: %s'%msg)
 	#def debug
 
-	def load_appimage_catalogue(self):
+	def get_bundles_catalogue(self):
 		applist=[]
 		appdict={}
 		all_apps=[]
@@ -166,14 +167,13 @@ class appimageToAppstream:
 		if releases:
 			appinfo=self.load_json_appinfo(appimage)
 			appinfo['releases']=releases
-#			applist.append(appinfo)
-			self.queue.put(appinfo)
-#                  	for release in releases:
-#				tmp_appinfo=appinfo.copy()
-#				self._debug("Release: %s"%release)
-#				tmp_appinfo['name']=release
-#				tmp_appinfo['package']=release
-#				applist.append(tmp_appinfo)
+#			self.queue.put(appinfo)
+			for release in releases:
+				tmp_appinfo=appinfo.copy()
+				self._debug("Release: %s"%release)
+				tmp_appinfo['name']=release
+				tmp_appinfo['package']=release
+				self.queue.put(tmp_appinfo)
         #def _th_process_appimage
 
 	def load_json_appinfo(self,appimage):
@@ -191,7 +191,12 @@ class appimageToAppstream:
 			appinfo['icon']=appimage['icon']
 		if 'screenshots' in appimage.keys():
 			appinfo['thumbnails']=appimage['screenshots']
-		if 'authors' in appimage.keys():
+		if 'links' in appimage.keys():
+			if appimage['links']:
+				for link in appimage['links']:
+					if 'url' in link.keys() and link['type']=='Download':
+						appinfo['homepage']=link['url']
+		elif 'authors' in appimage.keys():
 			if appimage['authors']:
 				for author in appimage['authors']:
 					if 'url' in author.keys():
@@ -237,7 +242,25 @@ class appimageToAppstream:
 		semaphore.acquire()
 		lock=threading.Lock()
 		self._debug("Populating %s"%appinfo)
-		filename=outdir+appinfo['package'].lower().replace('appimage',"appdata")+".xml"
+		package=appinfo['name'].lower().replace(".appimage","")
+		if len(package)>40:
+			tmp_package=package.split('-')
+			tam=0
+			pos=1
+			index=0
+			banned=['linux32','linux64','i386','x86_64','ia32','amd64']
+			for tmp_name in tmp_package:
+				if (tam<len(tmp_name) and pos<index) and tmp_name not in banned:
+					tam=len(tmp_name)
+					pos=index
+				index+=1
+			print("Removed: %s"%tmp_package[pos])
+			tmp_package[pos]=''
+			package='-'.join(tmp_package)
+			package=package.replace("--","-")
+			package=package.replace("-.",".")
+
+		filename=outdir+package.lower().replace('appimage',"appdata")+".xml"
 		self._debug("checking if we need to download "+filename)
 		if not os.path.isfile(filename):
 			repo_info={'info_url':info_url,'repo':repo,repo_name:'repo_name'}
@@ -396,4 +419,4 @@ class appimageToAppstream:
 
 
 catalogue=appimageToAppstream()
-catalogue.load_appimage_catalogue()
+catalogue.get_bundles_catalogue()
