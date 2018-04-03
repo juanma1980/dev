@@ -22,7 +22,7 @@ import time
 class appimageToAppstream:
 
 	def __init__(self):
-		self.dbg=False
+		self.dbg=True
 		#To get the description of an app we must go to a specific url defined in url_info.
 		#$(appname) we'll be replaced with the appname so the url matches the right one.
 		#If other site has other url naming convention it'll be mandatory to define it with the appropiate replacements
@@ -57,6 +57,7 @@ class appimageToAppstream:
 				self._debug("Processing info...")
 			elif repo_info['type']=='json':
 				applist=self._process_appimage_json(self._fetch_repo(repo_info['url']),repo_name)
+
 			self._debug("Fetched repo "+repo_info['url'])
 			self._th_generate_xml_catalog(applist,outdir,repo_info['url_info'],repo_info['url'],repo_name)
 			all_apps.extend(applist)
@@ -169,10 +170,15 @@ class appimageToAppstream:
 			appinfo['releases']=releases
 #			self.queue.put(appinfo)
 			for release in releases:
+				#Release has the direct download url
+				tmp_release=release.split('/')
 				tmp_appinfo=appinfo.copy()
+				rel_number=tmp_release[-2]
+				rel_name=tmp_release[-1].lower().replace('.appimage','')
 				self._debug("Release: %s"%release)
-				tmp_appinfo['name']=release
-				tmp_appinfo['package']=release
+				tmp_appinfo['name']=rel_name
+				tmp_appinfo['package']=tmp_release[-1]
+				tmp_appinfo['homepage']='/'.join(tmp_release[0:-1])
 				self.queue.put(tmp_appinfo)
         #def _th_process_appimage
 
@@ -213,16 +219,20 @@ class appimageToAppstream:
 					if link['type']=='Download':
 						self._debug("Info url: %s"%link['url'])
 						try:
+							sw_git=False
 							with urllib.request.urlopen(link['url']) as f:
+								if 'github' in link['url']:
+									sw_git=True
 								content=(f.read().decode('utf-8'))
 								soup=BeautifulSoup(content,"html.parser")
 								package_a=soup.findAll('a', attrs={ "href" : re.compile(r'.*[aA]pp[iI]mage$')})
 								for package_data in package_a:
-									package_soup=BeautifulSoup(str(package_data),"html.parser")
-									package_name=package_soup.findAll('strong', attrs={ "class" : "pl-1"})
-#									self._debug("Release name: %s"%package_name)
-									for name in package_name:
-										releases.append(name.get_text())
+									package_name=package_data.findAll('strong', attrs={ "class" : "pl-1"})
+									package_link=package_data['href']
+									if sw_git:
+										package_link="https://github.com"+package_link
+										releases.append(package_link)
+										self._debug("Link: %s"%package_link)
 						except Exception as e:
 							print(e)
 		return releases
@@ -279,11 +289,13 @@ class appimageToAppstream:
 			f.write("  <pkgname>%s</pkgname>\n"%appinfo['package'])
 			f.write("  <name>%s</name>\n"%name)
 			f.write("  <metadata_license>CC0-1.0</metadata_license>\n")
-			f.write("  <provides><binary>%s</binary></provides>\n"%appinfo['name'])
+			f.write("  <provides><binary>%s</binary></provides>\n"%appinfo['package'])
 			if 'releases' in appinfo.keys():
 				f.write("  <releases>\n")
 				for release in appinfo['releases']:
-					f.write("    <release version=\"%s\" urgency=\"medium\">"%release)
+					tmp_release=release.split('/')
+					rel_number='/'.join(tmp_release[-2:])
+					f.write("    <release version=\"%s\" urgency=\"medium\">"%rel_number)
 					f.write("</release>\n")
 				f.write("  </releases>\n")
 			f.write("  <launchable type=\"desktop-id\">%s.desktop</launchable>\n"%name)
